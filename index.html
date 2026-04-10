@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Da Vinci Bridge - Three.js + Vite</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div class="ui-panel">
+      <h1>Da Vinci Bridge</h1>
+      <p>Model interaktif sederhana berbasis Three.js</p>
+
+      <label>
+        Jumlah modul
+        <input id="modules" type="range" min="4" max="12" step="1" value="7" />
+        <span id="modulesValue">7</span>
+      </label>
+
+      <label>
+        Tinggi lengkung
+        <input id="arch" type="range" min="0.6" max="2.4" step="0.1" value="1.4" />
+        <span id="archValue">1.4</span>
+      </label>
+
+      <label>
+        Kemiringan stick
+        <input id="tilt" type="range" min="18" max="42" step="1" value="29" />
+        <span id="tiltValue">29°</span>
+      </label>
+
+      <div class="buttons">
+        <button id="assembleBtn">Rakit ulang</button>
+        <button id="autoRotateBtn">Auto rotate: off</button>
+      </div>
+
+      <small>Drag untuk memutar kamera • Scroll untuk zoom • Arahkan mouse ke stick untuk highlight</small>
+    </div>
+
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>
