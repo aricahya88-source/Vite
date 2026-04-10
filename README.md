@@ -1,50 +1,32 @@
-# Da Vinci Bridge - Three.js + Vite
+# Da Vinci Popsicle Bridge – Vite + Three.js
 
-Model 3D interaktif sederhana bergaya **Da Vinci bridge** menggunakan **Three.js** dan **Vite**.
+Model interaktif jembatan stik es krim bergaya *Leonardo Da Vinci bridge*.
 
-## Fitur
-- Orbit control (drag untuk rotasi, scroll untuk zoom)
-- Slider jumlah modul
-- Slider tinggi lengkung
-- Slider kemiringan stick
-- Tombol rakit ulang
-- Hover highlight pada stick kayu
+## Jalankan lokal
 
-## Struktur Proyek
-```text
-.
-├─ .github/
-│  └─ workflows/
-│     └─ deploy.yml
-├─ index.html
-├─ main.js
-├─ style.css
-├─ package.json
-├─ vite.config.js
-├─ .gitignore
-└─ README.md
-```
-
-## Jalankan Lokal
 ```bash
 npm install
 npm run dev
 ```
 
 ## Build
+
 ```bash
 npm run build
 ```
 
-## Upload ke GitHub
-1. Extract file ZIP ini di komputer.
-2. Buat repository baru di GitHub.
-3. Upload **isi folder proyek**, bukan file ZIP-nya saja.
-4. Pastikan branch utama bernama `main`.
-5. Masuk ke **Settings > Pages** lalu pilih **GitHub Actions**.
-6. Push perubahan ke branch `main`, lalu GitHub akan build dan deploy otomatis.
+## Fitur
 
-## Catatan
-- Folder `node_modules` dan `dist` tidak perlu diunggah.
-- Workflow sudah disiapkan untuk GitHub Pages.
-- Konfigurasi `base: './'` di `vite.config.js` dipilih agar aset memakai path relatif.
+- Bentuk stik menyerupai *popsicle stick* dengan ujung membulat
+- Jumlah segmen bisa ditambah atau dikurangi
+- Nilai lengkung atap, kemiringan kaki, dan lebar jembatan bisa diatur
+- Highlight saat kursor diarahkan ke stik
+- Cocok dijadikan dasar untuk GitHub Pages
+
+## Catatan GitHub Pages
+
+Kalau ingin dipasang di repo GitHub Pages biasa, ubah `base` di `vite.config.js` menjadi:
+
+```js
+base: '/NAMA-REPO/'
+```

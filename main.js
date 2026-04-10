@@ -1,228 +1,308 @@
 import * as THREE from 'three'
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
+
+const params = {
+  modules: 4,
+  arch: 1.3,
+  supportAngle: 27,
+  width: 1.65,
+}
 
 const scene = new THREE.Scene()
-scene.background = new THREE.Color(0x0b1020)
-scene.fog = new THREE.Fog(0x0b1020, 14, 28)
+scene.background = new THREE.Color(0x0b1420)
+scene.fog = new THREE.Fog(0x0b1420, 18, 34)
 
-const camera = new THREE.PerspectiveCamera(
-  50,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  100
-)
-camera.position.set(7, 5.5, 10)
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100)
+camera.position.set(6.8, 4.3, 8.8)
 
 const renderer = new THREE.WebGLRenderer({ antialias: true })
 renderer.setSize(window.innerWidth, window.innerHeight)
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 renderer.shadowMap.enabled = true
 renderer.shadowMap.type = THREE.PCFSoftShadowMap
+renderer.outputColorSpace = THREE.SRGBColorSpace
+renderer.toneMapping = THREE.ACESFilmicToneMapping
+renderer.toneMappingExposure = 1.1
+
 document.body.appendChild(renderer.domElement)
 
 const controls = new OrbitControls(camera, renderer.domElement)
 controls.enableDamping = true
-controls.target.set(0, 1.5, 0)
-controls.autoRotate = false
-controls.autoRotateSpeed = 1.0
+controls.minDistance = 4
+controls.maxDistance = 22
+controls.target.set(0, 0.9, 0)
 
-const hemi = new THREE.HemisphereLight(0xbfd9ff, 0x4b3425, 1.25)
-scene.add(hemi)
+const ambientLight = new THREE.HemisphereLight(0xdff6ff, 0x142231, 1.45)
+scene.add(ambientLight)
 
-const dir = new THREE.DirectionalLight(0xffffff, 1.3)
-dir.position.set(6, 10, 4)
-dir.castShadow = true
-dir.shadow.mapSize.width = 2048
-dir.shadow.mapSize.height = 2048
-dir.shadow.camera.near = 0.5
-dir.shadow.camera.far = 30
-scene.add(dir)
+const keyLight = new THREE.DirectionalLight(0xfff7eb, 2.2)
+keyLight.position.set(5, 8, 6)
+keyLight.castShadow = true
+keyLight.shadow.mapSize.set(2048, 2048)
+keyLight.shadow.camera.left = -12
+keyLight.shadow.camera.right = 12
+keyLight.shadow.camera.top = 12
+keyLight.shadow.camera.bottom = -12
+scene.add(keyLight)
 
-const fill = new THREE.DirectionalLight(0xffd6a5, 0.45)
-fill.position.set(-5, 4, -6)
-scene.add(fill)
+const rimLight = new THREE.DirectionalLight(0xb9e9ff, 0.9)
+rimLight.position.set(-5, 4, -6)
+scene.add(rimLight)
 
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(60, 60),
+  new THREE.PlaneGeometry(40, 40),
   new THREE.MeshStandardMaterial({
-    color: 0x172033,
+    color: 0x143145,
     roughness: 0.95,
-    metalness: 0.05,
-  })
+    metalness: 0.02,
+  }),
 )
 ground.rotation.x = -Math.PI / 2
-ground.position.y = -0.75
+ground.position.y = -1.45
 ground.receiveShadow = true
 scene.add(ground)
 
-const grid = new THREE.GridHelper(30, 30, 0x385074, 0x24334d)
-grid.position.y = -0.74
+const grid = new THREE.GridHelper(34, 30, 0x5ca6bd, 0x2c5365)
+grid.position.y = -1.42
+grid.material.transparent = true
+grid.material.opacity = 0.28
 scene.add(grid)
 
-const woodMaterial = new THREE.MeshStandardMaterial({
-  color: 0xc08a54,
-  roughness: 0.76,
-  metalness: 0.06,
-})
+const bridgeRoot = new THREE.Group()
+scene.add(bridgeRoot)
 
-const woodHighlightMaterial = woodMaterial.clone()
-woodHighlightMaterial.emissive = new THREE.Color(0x7a4e1c)
-woodHighlightMaterial.emissiveIntensity = 0.35
-
-let bridgeGroup = null
-let animatedParts = []
-let hoveredMesh = null
-
+const stickMeshes = []
 const raycaster = new THREE.Raycaster()
-const pointer = new THREE.Vector2()
-const clock = new THREE.Clock()
+const pointer = new THREE.Vector2(2, 2)
+let hoveredStick = null
+let time = 0
+
+const STICK_BASE_LENGTH = 1.22
+const STICK_WIDTH = 0.13
+const STICK_THICKNESS = 0.03
+const stickGeometry = new RoundedBoxGeometry(STICK_BASE_LENGTH, STICK_WIDTH, STICK_THICKNESS, 8, 0.03)
 
 const ui = {
-  modules: document.getElementById('modules'),
-  arch: document.getElementById('arch'),
-  tilt: document.getElementById('tilt'),
-  modulesValue: document.getElementById('modulesValue'),
-  archValue: document.getElementById('archValue'),
-  tiltValue: document.getElementById('tiltValue'),
-  assembleBtn: document.getElementById('assembleBtn'),
-  autoRotateBtn: document.getElementById('autoRotateBtn'),
+  moduleRange: document.querySelector('#moduleRange'),
+  archRange: document.querySelector('#archRange'),
+  tiltRange: document.querySelector('#tiltRange'),
+  widthRange: document.querySelector('#widthRange'),
+  moduleValue: document.querySelector('#moduleValue'),
+  estimatedValue: document.querySelector('#estimatedValue'),
+  archValue: document.querySelector('#archValue'),
+  tiltValue: document.querySelector('#tiltValue'),
+  widthValue: document.querySelector('#widthValue'),
+  stickCountBadge: document.querySelector('#stickCountBadge'),
+  minusBtn: document.querySelector('#minusBtn'),
+  plusBtn: document.querySelector('#plusBtn'),
+  rebuildBtn: document.querySelector('#rebuildBtn'),
+  viewBtn: document.querySelector('#viewBtn'),
 }
 
-function stickGeometry(length = 3.0, thickness = 0.18, width = 0.24) {
-  return new THREE.BoxGeometry(width, thickness, length)
-}
-
-function createStick(length, width = 0.22, thickness = 0.14) {
-  const mesh = new THREE.Mesh(stickGeometry(length, thickness, width), woodMaterial)
-  mesh.castShadow = true
-  mesh.receiveShadow = true
-  return mesh
-}
-
-function makeAnimated(mesh, delay = 0) {
-  mesh.userData.targetPosition = mesh.position.clone()
-  mesh.userData.targetQuaternion = mesh.quaternion.clone()
-
-  const radius = 7 + Math.random() * 2
-  const angle = Math.random() * Math.PI * 2
-
-  mesh.position.set(
-    Math.cos(angle) * radius,
-    -3 - Math.random() * 1.5,
-    Math.sin(angle) * radius
-  )
-  mesh.rotation.set(
-    Math.random() * Math.PI,
-    Math.random() * Math.PI,
-    Math.random() * Math.PI
-  )
-  mesh.userData.delay = delay
-  animatedParts.push(mesh)
-}
-
-function archY(t, archHeight) {
-  return 0.4 + archHeight * (1 - t * t)
-}
-
-function buildBridge({ modules, archHeight, tiltDeg }) {
-  if (bridgeGroup) {
-    scene.remove(bridgeGroup)
-  }
-
-  bridgeGroup = new THREE.Group()
-  animatedParts = []
-
-  const laneWidth = 3.6
-  const halfLane = laneWidth / 2
-  const spacing = 1.2
-  const stickLength = 3.0
-  const sideLift = 0.55
-  const tilt = THREE.MathUtils.degToRad(tiltDeg)
-
-  const totalLength = (modules - 1) * spacing
-
-  for (let i = 0; i < modules; i++) {
-    const t = modules === 1 ? 0 : (i / (modules - 1)) * 2 - 1
-    const z = i * spacing - totalLength / 2
-    const yBase = archY(t, archHeight)
-
-    const left = createStick(stickLength)
-    left.position.set(-halfLane + 0.5, yBase, z)
-    left.rotation.set(0, Math.PI / 2, tilt)
-    bridgeGroup.add(left)
-    makeAnimated(left, i * 0.06)
-
-    const right = createStick(stickLength)
-    right.position.set(halfLane - 0.5, yBase, z)
-    right.rotation.set(0, Math.PI / 2, -tilt)
-    bridgeGroup.add(right)
-    makeAnimated(right, i * 0.06 + 0.04)
-
-    const deck = createStick(laneWidth - 0.1, 0.26, 0.13)
-    deck.position.set(0, yBase + sideLift, z)
-    deck.rotation.set(0, 0, 0)
-    bridgeGroup.add(deck)
-    makeAnimated(deck, i * 0.06 + 0.08)
-
-    if (i < modules - 1) {
-      const zNext = (i + 1) * spacing - totalLength / 2
-      const tNext = ((i + 1) / (modules - 1)) * 2 - 1
-      const yNext = archY(tNext, archHeight)
-      const avgY = (yBase + yNext) * 0.5 + 0.12
-      const span = Math.sqrt((zNext - z) ** 2 + (yNext - yBase) ** 2)
-      const slope = Math.atan2(yNext - yBase, zNext - z)
-
-      const leftRail = createStick(span + 0.45, 0.16, 0.11)
-      leftRail.position.set(-halfLane + 0.98, avgY, (z + zNext) * 0.5)
-      leftRail.rotation.set(-slope, 0, 0)
-      bridgeGroup.add(leftRail)
-      makeAnimated(leftRail, i * 0.06 + 0.12)
-
-      const rightRail = createStick(span + 0.45, 0.16, 0.11)
-      rightRail.position.set(halfLane - 0.98, avgY, (z + zNext) * 0.5)
-      rightRail.rotation.set(-slope, 0, 0)
-      bridgeGroup.add(rightRail)
-      makeAnimated(rightRail, i * 0.06 + 0.16)
-
-      const cross = createStick(laneWidth + 0.85, 0.13, 0.11)
-      cross.position.set(0, avgY + 0.3, (z + zNext) * 0.5)
-      cross.rotation.set(0.48, 0, i % 2 === 0 ? 0.32 : -0.32)
-      bridgeGroup.add(cross)
-      makeAnimated(cross, i * 0.06 + 0.2)
-    }
-  }
-
-  const baseBeam = createStick(totalLength + 2.4, 0.18, 0.14)
-  baseBeam.position.set(0, -0.12, 0)
-  baseBeam.rotation.set(Math.PI / 2, 0, 0)
-  bridgeGroup.add(baseBeam)
-  makeAnimated(baseBeam, modules * 0.08)
-
-  scene.add(bridgeGroup)
-}
-
-function updateLabels() {
-  ui.modulesValue.textContent = ui.modules.value
-  ui.archValue.textContent = Number(ui.arch.value).toFixed(1)
-  ui.tiltValue.textContent = `${ui.tilt.value}°`
-}
-
-function rebuild() {
-  updateLabels()
-  buildBridge({
-    modules: Number(ui.modules.value),
-    archHeight: Number(ui.arch.value),
-    tiltDeg: Number(ui.tilt.value),
+function woodMaterial() {
+  const tone = [0xe8d3b1, 0xe0c79f, 0xd9bb8d, 0xefdbbc][Math.floor(Math.random() * 4)]
+  return new THREE.MeshStandardMaterial({
+    color: tone,
+    roughness: 0.82,
+    metalness: 0.03,
+    emissive: 0x000000,
   })
 }
 
-ui.modules.addEventListener('input', rebuild)
-ui.arch.addEventListener('input', rebuild)
-ui.tilt.addEventListener('input', rebuild)
-ui.assembleBtn.addEventListener('click', rebuild)
-ui.autoRotateBtn.addEventListener('click', () => {
-  controls.autoRotate = !controls.autoRotate
-  ui.autoRotateBtn.textContent = `Auto rotate: ${controls.autoRotate ? 'on' : 'off'}`
+function clearBridge() {
+  const existingChildren = [...bridgeRoot.children]
+  existingChildren.forEach((child) => {
+    bridgeRoot.remove(child)
+    child.traverse((node) => {
+      if (node.isMesh && node.material) {
+        node.material.dispose()
+      }
+    })
+  })
+  stickMeshes.length = 0
+  hoveredStick = null
+}
+
+function addStick(group, start, end, extra = {}) {
+  const direction = new THREE.Vector3().subVectors(end, start)
+  const length = direction.length()
+  if (length <= 0.001) return null
+
+  const mesh = new THREE.Mesh(stickGeometry, woodMaterial())
+  mesh.castShadow = true
+  mesh.receiveShadow = true
+  mesh.scale.set(length / STICK_BASE_LENGTH, 1, 1)
+  mesh.position.copy(start).add(end).multiplyScalar(0.5)
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), direction.normalize())
+
+  if (extra.lift) {
+    mesh.position.y += extra.lift
+  }
+
+  if (extra.roll) {
+    const rollQuat = new THREE.Quaternion().setFromAxisAngle(direction.normalize(), extra.roll)
+    mesh.quaternion.multiply(rollQuat)
+  }
+
+  mesh.userData.baseEmissive = 0x000000
+  mesh.userData.highlightEmissive = 0x3c2206
+  group.add(mesh)
+  stickMeshes.push(mesh)
+  return mesh
+}
+
+function bridgeNodes(moduleCount, span, roofHeight) {
+  const nodes = []
+  const startX = -span / 2
+  const step = span / moduleCount
+
+  for (let i = 0; i <= moduleCount; i += 1) {
+    const x = startX + i * step
+    const peakFactor = 1 - Math.abs((x / (span / 2 || 1)))
+    const y = 0.65 + roofHeight * Math.max(0, peakFactor)
+    nodes.push({ x, y })
+  }
+
+  return nodes
+}
+
+function buildBridge() {
+  clearBridge()
+
+  const moduleCount = params.modules
+  const span = moduleCount * 1.35
+  const depth = params.width
+  const sideZ = depth / 2
+  const roofHeight = params.arch
+  const footAngle = THREE.MathUtils.degToRad(params.supportAngle)
+  const root = new THREE.Group()
+  bridgeRoot.add(root)
+
+  const nodes = bridgeNodes(moduleCount, span, roofHeight)
+  const centerX = 0
+  const deckY = 0.1
+  const legLength = 1.08
+  const endDrop = Math.sin(footAngle) * legLength
+  const tipReach = Math.cos(footAngle) * legLength
+
+  const makeVec = (x, y, z) => new THREE.Vector3(x, y, z)
+
+  ;[-1, 1].forEach((zSign) => {
+    const z = sideZ * zSign
+
+    for (let i = 0; i < nodes.length - 1; i += 1) {
+      const current = nodes[i]
+      const next = nodes[i + 1]
+      addStick(root, makeVec(current.x, deckY, z), makeVec(next.x, deckY, z))
+      addStick(root, makeVec(current.x, current.y, z), makeVec(next.x, next.y, z))
+    }
+
+    nodes.forEach((node, index) => {
+      const baseLift = index === 0 || index === nodes.length - 1 ? 0.06 : 0
+      addStick(root, makeVec(node.x, deckY + baseLift, z), makeVec(node.x, node.y, z))
+    })
+
+    for (let i = 0; i < nodes.length - 1; i += 1) {
+      const current = nodes[i]
+      const next = nodes[i + 1]
+      const center = (current.x + next.x) / 2
+      const diagTop = i < moduleCount / 2 ? current : next
+      addStick(root, makeVec(center, deckY + 0.02, z), makeVec(diagTop.x, diagTop.y, z))
+    }
+
+    const leftBase = makeVec(nodes[0].x, deckY, z)
+    const rightBase = makeVec(nodes[nodes.length - 1].x, deckY, z)
+    const leftTip = makeVec(nodes[0].x - tipReach, deckY - endDrop, z)
+    const rightTip = makeVec(nodes[nodes.length - 1].x + tipReach, deckY - endDrop, z)
+
+    addStick(root, leftTip, leftBase)
+    addStick(root, rightBase, rightTip)
+
+    const midLeftAnchor = makeVec(centerX - 0.25, deckY + 0.02, z)
+    const midRightAnchor = makeVec(centerX + 0.25, deckY + 0.02, z)
+    const leftUnder = leftTip.clone().lerp(midLeftAnchor, 0.96)
+    const rightUnder = rightTip.clone().lerp(midRightAnchor, 0.96)
+
+    addStick(root, leftTip, leftUnder, { lift: 0.02, roll: footAngle * 0.05 })
+    addStick(root, rightUnder, rightTip, { lift: 0.02, roll: -footAngle * 0.05 })
+  })
+
+  for (let i = 0; i < moduleCount; i += 1) {
+    const startX = nodes[i].x
+    const endX = nodes[i + 1].x
+    const midX = (startX + endX) / 2
+    addStick(root, makeVec(midX, deckY + 0.01, -sideZ), makeVec(midX, deckY + 0.01, sideZ), { roll: Math.PI / 2 })
+  }
+
+  nodes.forEach((node, index) => {
+    if (index === 0 || index === nodes.length - 1) return
+    addStick(root, makeVec(node.x, node.y, -sideZ), makeVec(node.x, node.y, sideZ), { roll: Math.PI / 2 })
+  })
+
+  const leftRoofA = makeVec(nodes[1].x, nodes[1].y + 0.04, sideZ)
+  const leftRoofB = makeVec(centerX, nodes[Math.floor(nodes.length / 2)].y + 0.28, 0)
+  const rightRoofA = makeVec(centerX, nodes[Math.floor(nodes.length / 2)].y + 0.28, 0)
+  const rightRoofB = makeVec(nodes[nodes.length - 2].x, nodes[nodes.length - 2].y + 0.04, sideZ)
+  const leftRoofA2 = leftRoofA.clone().setZ(-sideZ)
+  const rightRoofB2 = rightRoofB.clone().setZ(-sideZ)
+
+  addStick(root, leftRoofA, leftRoofB)
+  addStick(root, leftRoofA2, leftRoofB)
+  addStick(root, rightRoofA, rightRoofB)
+  addStick(root, rightRoofA, rightRoofB2)
+
+  const underCrossA = makeVec(-span * 0.23, deckY - 0.24, -sideZ)
+  const underCrossB = makeVec(span * 0.23, deckY - 0.24, sideZ)
+  const underCrossC = makeVec(-span * 0.23, deckY - 0.24, sideZ)
+  const underCrossD = makeVec(span * 0.23, deckY - 0.24, -sideZ)
+  addStick(root, underCrossA, underCrossB)
+  addStick(root, underCrossC, underCrossD)
+
+  root.position.y = -0.15
+
+  ui.stickCountBadge.textContent = `${stickMeshes.length} sticks`
+  ui.estimatedValue.textContent = `perkiraan ${stickMeshes.length} stik`
+}
+
+function updateLabels() {
+  ui.moduleValue.textContent = `${params.modules} segmen`
+  ui.archValue.textContent = params.arch.toFixed(1)
+  ui.tiltValue.textContent = `${params.supportAngle}°`
+  ui.widthValue.textContent = params.width.toFixed(2)
+}
+
+function updateFromInputs() {
+  params.modules = Number(ui.moduleRange.value)
+  params.arch = Number(ui.archRange.value)
+  params.supportAngle = Number(ui.tiltRange.value)
+  params.width = Number(ui.widthRange.value)
+  updateLabels()
+  buildBridge()
+}
+
+ui.moduleRange.addEventListener('input', updateFromInputs)
+ui.archRange.addEventListener('input', updateFromInputs)
+ui.tiltRange.addEventListener('input', updateFromInputs)
+ui.widthRange.addEventListener('input', updateFromInputs)
+ui.rebuildBtn.addEventListener('click', buildBridge)
+
+ui.minusBtn.addEventListener('click', () => {
+  const nextValue = Math.max(Number(ui.moduleRange.min), Number(ui.moduleRange.value) - 1)
+  ui.moduleRange.value = String(nextValue)
+  updateFromInputs()
+})
+
+ui.plusBtn.addEventListener('click', () => {
+  const nextValue = Math.min(Number(ui.moduleRange.max), Number(ui.moduleRange.value) + 1)
+  ui.moduleRange.value = String(nextValue)
+  updateFromInputs()
+})
+
+ui.viewBtn.addEventListener('click', () => {
+  camera.position.set(0.1, 2.15, 11.5)
+  controls.target.set(0, 0.6, 0)
+  controls.update()
 })
 
 window.addEventListener('pointermove', (event) => {
@@ -237,52 +317,34 @@ window.addEventListener('resize', () => {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 })
 
-rebuild()
-
-function animateAssembly(elapsedTime) {
-  for (const mesh of animatedParts) {
-    const delay = mesh.userData.delay || 0
-    const duration = 0.75
-    const p = THREE.MathUtils.clamp((elapsedTime - delay) / duration, 0, 1)
-    const eased = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2
-
-    mesh.position.lerp(mesh.userData.targetPosition, eased * 0.18)
-    mesh.quaternion.slerp(mesh.userData.targetQuaternion, eased * 0.18)
-
-    if (p > 0.999) {
-      mesh.position.copy(mesh.userData.targetPosition)
-      mesh.quaternion.copy(mesh.userData.targetQuaternion)
-    }
-  }
-}
-
-function updateHover() {
+function handleHover() {
   raycaster.setFromCamera(pointer, camera)
-  const intersects = raycaster.intersectObjects(bridgeGroup ? bridgeGroup.children : [], false)
+  const hits = raycaster.intersectObjects(stickMeshes, false)
+  const nextHovered = hits.length > 0 ? hits[0].object : null
 
-  if (hoveredMesh && (!intersects.length || intersects[0].object !== hoveredMesh)) {
-    hoveredMesh.material = woodMaterial
-    hoveredMesh = null
+  if (hoveredStick && hoveredStick !== nextHovered) {
+    hoveredStick.material.emissive.setHex(hoveredStick.userData.baseEmissive)
   }
 
-  if (intersects.length) {
-    const next = intersects[0].object
-    if (hoveredMesh !== next) {
-      if (hoveredMesh) hoveredMesh.material = woodMaterial
-      hoveredMesh = next
-      hoveredMesh.material = woodHighlightMaterial
-    }
+  if (nextHovered) {
+    nextHovered.material.emissive.setHex(nextHovered.userData.highlightEmissive)
   }
+
+  hoveredStick = nextHovered
 }
 
 function animate() {
   requestAnimationFrame(animate)
-  const elapsed = clock.getElapsedTime()
-
-  animateAssembly(elapsed)
-  updateHover()
+  time += 0.008
+  handleHover()
   controls.update()
+
+  bridgeRoot.rotation.y = Math.sin(time * 0.4) * 0.03
+  bridgeRoot.position.y = Math.sin(time) * 0.02
+
   renderer.render(scene, camera)
 }
 
+updateLabels()
+buildBridge()
 animate()

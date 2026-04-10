@@ -1,5 +1,5 @@
 {
-  "name": "davinci-bridge-vite",
+  "name": "davinci-bridge-popsicle-vite",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -9,9 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "three": "^0.183.0"
+    "three": "^0.169.0"
   },
   "devDependencies": {
-    "vite": "^7.1.7"
+    "vite": "^5.4.8"
   }
 }
